@@ -2602,10 +2602,10 @@ void Node3DEditor::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_VISIBILITY_CHANGED: {
-			const bool visible = is_visible_in_tree();
-			set_process(visible);
-			set_physics_process(visible);
-			if (visible) {
+			const bool visible_in_tree = is_visible_in_tree();
+			set_process(visible_in_tree);
+			set_physics_process(visible_in_tree);
+			if (visible_in_tree) {
 				if (is_any_view_gizmos_enabled()) {
 					update_all_gizmos();
 				}
