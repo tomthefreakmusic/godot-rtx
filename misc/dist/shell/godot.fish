@@ -102,6 +102,7 @@ complete -c godot -l ignore-error-breaks -d "If debugger is connected, prevents 
 complete -c godot -l profiling -d "Enable profiling in the script debugger"
 complete -c godot -l gpu-profile -d "Show a GPU profile of the tasks that took the most time during frame rendering"
 complete -c godot -l gpu-validation -d "Enable graphics API validation layers for debugging"
+complete -c godot -l raytracing-validation -d "Enable NVIDIA ray tracing validation layer (Vulkan only)"
 complete -c godot -l gpu-abort -d "Abort on graphics API usage errors (usually validation layer errors)"
 complete -c godot -l generate-spirv-debug-info -d "Generate SPIR-V debug information (Vulkan only)"
 complete -c godot -l clear-shader-cache -d "Clear the shader_cache directory at launch, so it's re-generated"

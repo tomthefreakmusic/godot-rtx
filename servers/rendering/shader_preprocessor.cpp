@@ -1250,6 +1250,10 @@ void ShaderPreprocessor::insert_builtin_define(String p_name, String p_value, St
 	p_state.defines[p_name] = define;
 }
 
+void ShaderPreprocessor::add_define(const String &p_name, const String &p_value) {
+	custom_defines.push_back({ p_name, p_value });
+}
+
 void ShaderPreprocessor::clear_state() {
 	if (state != nullptr) {
 		for (const RBMap<String, Define *>::Element *E = state->defines.front(); E; E = E->next()) {
@@ -1364,6 +1368,10 @@ void ShaderPreprocessor::_prepare_state(ShaderPreprocessor::State &rp_state, con
 Error ShaderPreprocessor::preprocess(const String &p_code, const String &p_filename, String &r_result, HashSet<Ref<ShaderInclude>> *r_includes) {
 	State pp_state;
 	_prepare_state(pp_state, p_filename, false);
+	for (const Pair<String, String> &def : custom_defines) {
+		insert_builtin_define(def.first, def.second, pp_state);
+	}
+
 	Error err = preprocess(&pp_state, p_code, r_result);
 	if (r_includes) {
 		*r_includes = pp_state.shader_includes;

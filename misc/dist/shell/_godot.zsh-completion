@@ -77,6 +77,7 @@ _arguments \
   '--profiling[enable profiling in the script debugger]' \
   '--gpu-profile[show a GPU profile of the tasks that took the most time during frame rendering]' \
   '--gpu-validation[enable graphics API validation layers for debugging]' \
+  '--raytracing-validation[enable NVIDIA ray tracing validation layer (Vulkan only)]' \
   '--gpu-abort[abort on graphics API usage errors (usually validation layer errors)]' \
   '--generate-spirv-debug-info[generate SPIR-V debug information (Vulkan only)]' \
   "--clear-shader-cache[clear the shader_cache directory at launch, so it's re-generated]" \

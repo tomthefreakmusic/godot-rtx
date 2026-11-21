@@ -78,6 +78,7 @@ _complete_godot_options() {
 --profiling
 --gpu-profile
 --gpu-validation
+--raytracing-validation
 --gpu-abort
 --generate-spirv-debug-info
 --clear-shader-cache

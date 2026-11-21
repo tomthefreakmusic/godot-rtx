@@ -168,6 +168,15 @@ bool Light3D::get_allow_contact_shadows() const {
 	return allow_contact_shadows;
 }
 
+void Light3D::set_shadow_renderers(BitField<RSE::ShadowRenderer> p_renderers) {
+	shadow_renderers = p_renderers;
+	RS::get_singleton()->light_set_shadow_renderers(light, shadow_renderers);
+}
+
+BitField<RSE::ShadowRenderer> Light3D::get_shadow_renderers() const {
+	return shadow_renderers;
+}
+
 AABB Light3D::get_aabb() const {
 	if (type == RSE::LIGHT_DIRECTIONAL) {
 		return AABB(Vector3(-1, -1, -1), Vector3(2, 2, 2));
@@ -399,6 +408,9 @@ void Light3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_allow_contact_shadows", "enabled"), &Light3D::set_allow_contact_shadows);
 	ClassDB::bind_method(D_METHOD("get_allow_contact_shadows"), &Light3D::get_allow_contact_shadows);
 
+	ClassDB::bind_method(D_METHOD("set_shadow_renderers", "renderers"), &Light3D::set_shadow_renderers);
+	ClassDB::bind_method(D_METHOD("get_shadow_renderers"), &Light3D::get_shadow_renderers);
+
 	ClassDB::bind_method(D_METHOD("set_bake_mode", "bake_mode"), &Light3D::set_bake_mode);
 	ClassDB::bind_method(D_METHOD("get_bake_mode"), &Light3D::get_bake_mode);
 
@@ -435,6 +447,7 @@ void Light3D::_bind_methods() {
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "shadow_opacity", PROPERTY_HINT_RANGE, "0,1,0.01"), "set_param", "get_param", PARAM_SHADOW_OPACITY);
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "shadow_blur", PROPERTY_HINT_RANGE, "0,10,0.001"), "set_param", "get_param", PARAM_SHADOW_BLUR);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "shadow_caster_mask", PROPERTY_HINT_LAYERS_3D_RENDER), "set_shadow_caster_mask", "get_shadow_caster_mask");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "shadow_renderers", PROPERTY_HINT_FLAGS, "Rasterizer,Path Tracer"), "set_shadow_renderers", "get_shadow_renderers");
 	ADD_SUBGROUP("Contact Shadows", "shadow_contact_shadows_");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shadow_contact_shadows_allow", PROPERTY_HINT_GROUP_ENABLE), "set_allow_contact_shadows", "get_allow_contact_shadows");
 	ADD_PROPERTYI(PropertyInfo(Variant::FLOAT, "shadow_contact_shadows_blur", PROPERTY_HINT_RANGE, "0,10,0.001"), "set_param", "get_param", PARAM_CONTACT_SHADOW_BLUR);

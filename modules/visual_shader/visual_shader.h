@@ -151,6 +151,9 @@ private:
 	void _input_type_changed(Type p_type, int p_id);
 	bool _has_func_name(RSE::ShaderMode p_mode, const String &p_func_name) const;
 
+	bool _is_node_reaching_output_port(Type p_type, int p_node, const String &p_output_port_name) const;
+	void _apply_node_render_modes(HashMap<String, int> &r_modes, HashSet<StringName> &r_flags) const;
+
 protected:
 	static void _bind_methods();
 
@@ -380,6 +383,11 @@ public:
 
 	virtual String get_warning(Shader::Mode p_mode, VisualShader::Type p_type) const;
 	virtual bool is_available(Shader::Mode p_mode, VisualShader::Type p_type) const { return true; }
+
+	// Render modes this node needs. Only applied while its output reaches the
+	// output node's transform port (the vertex Model View Matrix); a reported
+	// billboard mode overrides the shader's Billboard setting.
+	virtual Vector<StringName> get_render_modes(Shader::Mode p_mode, VisualShader::Type p_type) const { return Vector<StringName>(); }
 
 	virtual Category get_category() const;
 };

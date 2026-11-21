@@ -76,6 +76,7 @@ private:
 	bool reverse_cull = false;
 	uint32_t cull_mask = 0;
 	uint32_t shadow_caster_mask = 0xFFFFFFFF;
+	BitField<RSE::ShadowRenderer> shadow_renderers = RSE::SHADOW_RENDERER_ALL;
 	bool distance_fade_enabled = false;
 	real_t distance_fade_begin = 40.0;
 	real_t distance_fade_shadow = 50.0;
@@ -142,6 +143,9 @@ public:
 
 	void set_allow_contact_shadows(bool p_enable);
 	bool get_allow_contact_shadows() const;
+
+	void set_shadow_renderers(BitField<RSE::ShadowRenderer> p_renderers);
+	BitField<RSE::ShadowRenderer> get_shadow_renderers() const;
 
 	void set_bake_mode(BakeMode p_mode);
 	BakeMode get_bake_mode() const;

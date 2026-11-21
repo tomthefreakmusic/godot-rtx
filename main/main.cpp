@@ -158,6 +158,9 @@
 #endif // TOOLS_ENABLED && !GDSCRIPT_NO_LSP
 #endif // MODULE_GDSCRIPT_ENABLED
 
+#include "drivers/aftermath/aftermath.h"
+#include "drivers/streamline/streamline.h"
+
 /* Static members */
 
 // Singletons
@@ -190,6 +193,8 @@ static ThemeDB *theme_db = nullptr;
 #ifndef XR_DISABLED
 static XRServer *xr_server = nullptr;
 #endif // XR_DISABLED
+static Streamline *streamline = nullptr;
+static Aftermath *aftermath = nullptr;
 // We error out if setup2() doesn't turn this true
 static bool _start_success = false;
 
@@ -604,10 +609,12 @@ void Main::print_help(const char *p_binary) {
 #endif
 	print_help_option("--gpu-profile", "Show a GPU profile of the tasks that took the most time during frame rendering.\n");
 	print_help_option("--gpu-validation", "Enable graphics API validation layers for debugging.\n");
+	print_help_option("--raytracing-validation", "Enable NVIDIA ray tracing validation layer (Vulkan only, requires VK_NV_ray_tracing_validation).\n");
 #ifdef DEBUG_ENABLED
 	print_help_option("--gpu-abort", "Abort on graphics API usage errors (usually validation layer errors). May help see the problem if your system freezes.\n", CLI_OPTION_AVAILABILITY_TEMPLATE_DEBUG);
 #endif
-	print_help_option("--generate-spirv-debug-info", "Generate SPIR-V debug information (Vulkan only). This allows source-level shader debugging with RenderDoc.\n");
+	print_help_option("--debug-shaders, --generate-spirv-debug-info", "Generate SPIR-V debug information (Vulkan only). This allows source-level shader debugging with RenderDoc.\n");
+	print_help_option("--gpu-markers", "Emit GPU begin/end event markers for tools such as GPU Trace and RenderDoc (Vulkan: debug utils; D3D12: PIX V2 BeginEvent/EndEvent).\n");
 	print_help_option("--clear-shader-cache", "Clear the shader_cache directory at launch, so it's re-generated.\n");
 #if defined(DEBUG_ENABLED) || defined(DEV_ENABLED)
 	print_help_option("--extra-gpu-memory-tracking", "Enables additional memory tracking (see class reference for `RenderingDevice.get_driver_and_device_memory_report()` and linked methods). Currently only implemented for Vulkan. Enabling this feature may cause crashes on some systems due to buggy drivers or bugs in the Vulkan Loader. See https://github.com/godotengine/godot/issues/95967\n", CLI_OPTION_AVAILABILITY_TEMPLATE_DEBUG);
@@ -1037,6 +1044,13 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 
 	MAIN_PRINT("Main: Parse CMDLine");
 
+	/* create streamline and register singleton */
+	streamline = memnew(Streamline);
+	Streamline::register_singleton();
+
+	/* create aftermath singleton (no project settings; DLL loaded on demand) */
+	aftermath = memnew(Aftermath);
+
 	/* argument parsing and main creation */
 	List<String> args;
 	List<String> main_args;
@@ -1136,7 +1150,12 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 #ifdef TOOLS_ENABLED
 		if (arg == "--debug" ||
 				arg == "--verbose" ||
-				arg == "--disable-crash-handler") {
+				arg == "--disable-crash-handler" ||
+				arg == "--debug-shaders" ||
+				arg == "--generate-spirv-debug-info" ||
+				arg == "--gpu-markers" ||
+				arg == "--gpu-validation" ||
+				arg == "--raytracing-validation") {
 			forwardable_cli_arguments[CLI_SCOPE_TOOL].push_back(arg);
 			forwardable_cli_arguments[CLI_SCOPE_PROJECT].push_back(arg);
 		}
@@ -1315,14 +1334,21 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 			}
 		} else if (arg == "--gpu-validation") {
 			Engine::singleton->use_validation_layers = true;
+		} else if (arg == "--raytracing-validation") {
+			Engine::singleton->use_raytracing_validation = true;
+			// The NVIDIA driver only exposes VK_NV_ray_tracing_validation when this is set before its first load,
+			// which happens before the rendering context is created.
+			OS::get_singleton()->set_environment("NV_ALLOW_RAYTRACING_VALIDATION", "1");
 #ifdef DEBUG_ENABLED
 		} else if (arg == "--gpu-abort") {
 			Engine::singleton->abort_on_gpu_errors = true;
 #endif
-		} else if (arg == "--generate-spirv-debug-info") {
+		} else if (arg == "--debug-shaders" || arg == "--generate-spirv-debug-info") {
 			Engine::singleton->generate_spirv_debug_info = true;
 		} else if (arg == "--clear-shader-cache") {
 			clear_shader_cache = true;
+		} else if (arg == "--gpu-markers") {
+			Engine::singleton->use_gpu_markers = true;
 #if defined(DEBUG_ENABLED) || defined(DEV_ENABLED)
 		} else if (arg == "--extra-gpu-memory-tracking") {
 			Engine::singleton->extra_gpu_memory_tracking = true;
@@ -2694,6 +2720,15 @@ Error Main::setup(const char *execpath, int argc, char *argv[], bool p_second_ph
 	}
 #endif
 
+	// start streamline and aftermath now that we know the API.
+	if (rendering_driver == "vulkan") {
+		Streamline::get_singleton()->emit_marker(STREAMLINE_MARKER_INITIALIZE_VULKAN);
+		Aftermath::get_singleton()->emit_marker(AFTERMATH_MARKER_INITIALIZE_VULKAN);
+	} else if (rendering_driver == "d3d12") {
+		Streamline::get_singleton()->emit_marker(STREAMLINE_MARKER_INITIALIZE_D3D12);
+		Aftermath::get_singleton()->emit_marker(AFTERMATH_MARKER_INITIALIZE_D3D12);
+	}
+
 	if (use_custom_res) {
 		if (!force_res) {
 			window_size.width = GLOBAL_GET("display/window/size/viewport_width");
@@ -3063,6 +3098,15 @@ error:
 
 	if (editor) {
 		OS::get_singleton()->remove_lock_file();
+	}
+
+	if (streamline) {
+		memdelete(streamline);
+		streamline = nullptr;
+	}
+	if (aftermath) {
+		memdelete(aftermath);
+		aftermath = nullptr;
 	}
 
 	EngineDebugger::deinitialize();
@@ -4967,6 +5011,11 @@ static uint64_t navigation_process_max = 0;
 bool Main::iteration() {
 	GodotProfileZone("Main::iteration");
 	GodotProfileZoneGroupedFirst(_profile_zone, "prepare");
+
+	if (Streamline::get_singleton()) {
+		Streamline::get_singleton()->emit_marker(STREAMLINE_MARKER_BEGIN_SIMULATION);
+	}
+
 	iterating++;
 
 	const uint64_t ticks = OS::get_singleton()->get_ticks_usec();
@@ -5119,6 +5168,10 @@ bool Main::iteration() {
 	NavigationServer3D::get_singleton()->process(process_step * time_scale);
 #endif // NAVIGATION_3D_DISABLED
 
+	if (Streamline::get_singleton()) {
+		Streamline::get_singleton()->emit_marker(STREAMLINE_MARKER_END_SIMULATION);
+	}
+
 	GodotProfileZoneGrouped(_profile_zone, "RenderingServer::sync");
 	RenderingServer::get_singleton()->sync(); //sync if still drawing from previous frames.
 
@@ -5249,6 +5302,10 @@ bool Main::iteration() {
 		EditorNode::get_singleton()->unload_editor_addons();
 	}
 #endif
+
+	if (Streamline::get_singleton()) {
+		Streamline::get_singleton()->emit_marker(STREAMLINE_MARKER_BEFORE_MESSAGE_LOOP);
+	}
 
 	return exit;
 }
@@ -5396,6 +5453,14 @@ void Main::cleanup(bool p_force) {
 
 	finalize_display();
 
+	if (streamline) {
+		memdelete(streamline);
+		streamline = nullptr;
+	}
+	if (aftermath) {
+		memdelete(aftermath);
+		aftermath = nullptr;
+	}
 	memdelete(input);
 	input = nullptr;
 

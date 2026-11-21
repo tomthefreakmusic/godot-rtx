@@ -1388,6 +1388,39 @@ void VisualShader::_resource_path_changed() {
 	}
 }
 
+// Billboard render modes indexed by the "modes/billboard" dropdown value.
+static const char *billboard_render_modes[] = { "", "billboard", "billboard_y", "billboard_particles" };
+
+static int billboard_render_mode_index(const String &p_mode) {
+	for (int i = 1; i < int(std_size(billboard_render_modes)); i++) {
+		if (p_mode == billboard_render_modes[i]) {
+			return i;
+		}
+	}
+	return 0;
+}
+
+// Returns the "modes/<group>" dropdown value selecting p_mode and stores the group in r_group, or -1 for plain flags.
+static int render_mode_dropdown_index(const Vector<ShaderLanguage::ModeInfo> &p_modes, const String &p_mode, String &r_group) {
+	const int billboard_index = billboard_render_mode_index(p_mode);
+	if (billboard_index != 0) {
+		r_group = "billboard";
+		return billboard_index;
+	}
+	for (const ShaderLanguage::ModeInfo &info : p_modes) {
+		const String prefix = String(info.name) + "_";
+		if (info.options.is_empty() || !p_mode.begins_with(prefix)) {
+			continue;
+		}
+		const int option = info.options.find(StringName(p_mode.substr(prefix.length())));
+		if (option >= 0) {
+			r_group = info.name;
+			return option;
+		}
+	}
+	return -1;
+}
+
 bool VisualShader::_set(const StringName &p_name, const Variant &p_value) {
 	String prop_name = p_name;
 	if (prop_name == "mode") {
@@ -1682,6 +1715,14 @@ void VisualShader::_get_property_list(List<PropertyInfo> *p_list) const {
 			continue;
 		}
 
+		// The mutually exclusive billboard modes are presented as one dropdown.
+		if (billboard_render_mode_index(info.name) != 0) {
+			if (info.name == "billboard") {
+				blend_mode_enums["billboard"] = "Disabled,Enabled,Y-Billboard,Particles";
+			}
+			continue;
+		}
+
 		if (!info.options.is_empty()) {
 			const String begin = String(info.name);
 
@@ -1817,6 +1858,67 @@ bool VisualShader::_has_func_name(RSE::ShaderMode p_mode, const String &p_func_n
 	return true;
 }
 
+bool VisualShader::_is_node_reaching_output_port(Type p_type, int p_node, const String &p_output_port_name) const {
+	const ShaderGraph &shader_graph = **graph[p_type];
+	const Ref<VisualShaderNode> output_node = shader_graph.get_node(NODE_ID_OUTPUT);
+	if (output_node.is_null()) {
+		return false;
+	}
+	HashSet<int> visited;
+	LocalVector<int> pending;
+	pending.push_back(p_node);
+	while (!pending.is_empty()) {
+		const int current = pending[pending.size() - 1];
+		pending.remove_at(pending.size() - 1);
+		if (visited.has(current)) {
+			continue;
+		}
+		visited.insert(current);
+		for (const ShaderGraph::Connection &connection : shader_graph.get_connections()) {
+			if (connection.from_node != current) {
+				continue;
+			}
+			if (connection.to_node == NODE_ID_OUTPUT) {
+				if (output_node->get_input_port_name(connection.to_port) == p_output_port_name) {
+					return true;
+				}
+			} else {
+				pending.push_back(connection.to_node);
+			}
+		}
+	}
+	return false;
+}
+
+void VisualShader::_apply_node_render_modes(HashMap<String, int> &r_modes, HashSet<StringName> &r_flags) const {
+	if (shader_mode != Shader::MODE_SPATIAL) {
+		return;
+	}
+	const Vector<ShaderLanguage::ModeInfo> &rmodes = ShaderTypes::get_singleton()->get_modes(RSE::ShaderMode(shader_mode));
+	for (const KeyValue<int, ShaderGraph::Node> &E : graph[TYPE_VERTEX]->get_nodes()) {
+		if (E.key == NODE_ID_OUTPUT || E.value.node.is_null()) {
+			continue;
+		}
+		const Vector<StringName> node_modes = E.value.node->get_render_modes(shader_mode, TYPE_VERTEX);
+		if (node_modes.is_empty() || !_is_node_reaching_output_port(TYPE_VERTEX, E.key, "Model View Matrix")) {
+			continue;
+		}
+		for (const StringName &node_mode : node_modes) {
+			String group;
+			const int node_index = render_mode_dropdown_index(rmodes, node_mode, group);
+			if (node_index < 0) {
+				r_flags.insert(node_mode);
+				continue;
+			}
+			const int current_index = r_modes.has(group) ? r_modes[group] : 0;
+			if (current_index != 0 && current_index != node_index) {
+				WARN_PRINT(vformat("VisualShader: node %d requires render mode '%s', overriding the '%s' setting.", E.key, String(node_mode), group));
+			}
+			r_modes[group] = node_index;
+		}
+	}
+}
+
 void VisualShader::_update_shader() const {
 	if (!dirty.is_set()) {
 		return;
@@ -1840,6 +1942,10 @@ void VisualShader::_update_shader() const {
 	{
 		const Vector<ShaderLanguage::ModeInfo> &rmodes = ShaderTypes::get_singleton()->get_modes(RSE::ShaderMode(shader_mode));
 		Vector<String> flag_names;
+		HashMap<String, int> effective_modes(render_modes);
+		HashSet<StringName> effective_flags(render_mode_flags);
+		_apply_node_render_modes(effective_modes, effective_flags);
+		const int billboard_index = effective_modes.has("billboard") ? effective_modes["billboard"] : 0;
 
 		// Add enum modes first.
 		for (int i = 0; i < rmodes.size(); i++) {
@@ -1848,18 +1954,31 @@ void VisualShader::_update_shader() const {
 
 			// Special handling for depth_test.
 			if (temp == "depth_test") {
-				if (render_mode_flags.has("depth_test_disabled")) {
+				if (effective_flags.has("depth_test_disabled")) {
 					flag_names.push_back("depth_test_disabled");
 				} else {
 					if (!render_mode.is_empty()) {
 						render_mode += ", ";
 					}
-					if (render_modes.has(temp) && render_modes[temp] < info.options.size()) {
-						render_mode += temp + "_" + info.options[render_modes[temp]];
+					if (effective_modes.has(temp) && effective_modes[temp] < info.options.size()) {
+						render_mode += temp + "_" + info.options[effective_modes[temp]];
 					} else {
 						render_mode += temp + "_" + info.options[0];
 					}
 				}
+				continue;
+			}
+
+			// Special handling for the mutually exclusive billboard modes (one dropdown).
+			if (billboard_render_mode_index(temp) != 0) {
+				if (temp == "billboard" && billboard_index > 0 && billboard_index < int(std_size(billboard_render_modes))) {
+					flag_names.push_back(billboard_render_modes[billboard_index]);
+				}
+				continue;
+			}
+
+			// rt_vertex_auto and rt_blas_auto are the engine defaults; left implicit so existing shaders keep their code.
+			if ((temp == "rt_vertex" || temp == "rt_blas") && !effective_modes.has(temp)) {
 				continue;
 			}
 
@@ -1870,13 +1989,13 @@ void VisualShader::_update_shader() const {
 				// Always write out a render_mode for the enumerated modes as having no render mode is not always
 				// the same as the default. i.e. for depth_draw_opaque, the render mode has to be declared for it
 				// to work properly, no render mode is an invalid option.
-				if (render_modes.has(temp) && render_modes[temp] < info.options.size()) {
-					render_mode += temp + "_" + info.options[render_modes[temp]];
+				if (effective_modes.has(temp) && effective_modes[temp] < info.options.size()) {
+					render_mode += temp + "_" + info.options[effective_modes[temp]];
 				} else {
 					// Use the default.
 					render_mode += temp + "_" + info.options[0];
 				}
-			} else if (render_mode_flags.has(temp)) {
+			} else if (effective_flags.has(temp)) {
 				flag_names.push_back(temp);
 			}
 		}

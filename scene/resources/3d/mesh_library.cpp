@@ -409,7 +409,7 @@ void MeshLibrary::_bind_methods() {
 	base_property_helper.register_property(PropertyInfo(Variant::STRING, PNAME("category"), PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NO_EDITOR), defaults.category, &MeshLibrary::set_item_category, &MeshLibrary::get_item_category);
 	base_property_helper.register_property(PropertyInfo(Variant::OBJECT, PNAME("mesh"), PROPERTY_HINT_RESOURCE_TYPE, Mesh::get_class_static(), PROPERTY_USAGE_NO_EDITOR), defaults.mesh, &MeshLibrary::set_item_mesh, &MeshLibrary::get_item_mesh);
 	base_property_helper.register_property(PropertyInfo(Variant::TRANSFORM3D, PNAME("mesh_transform"), PROPERTY_HINT_NONE, "suffix:m", PROPERTY_USAGE_NO_EDITOR), defaults.mesh_transform, &MeshLibrary::set_item_mesh_transform, &MeshLibrary::get_item_mesh_transform);
-	base_property_helper.register_property(PropertyInfo(Variant::INT, PNAME("mesh_cast_shadow"), PROPERTY_HINT_ENUM, "Off,On,Double-Sided,Shadows Only", PROPERTY_USAGE_NO_EDITOR), defaults.mesh_cast_shadow, &MeshLibrary::set_item_mesh_cast_shadow, &MeshLibrary::get_item_mesh_cast_shadow);
+	base_property_helper.register_property(PropertyInfo(Variant::INT, PNAME("mesh_cast_shadow"), PROPERTY_HINT_ENUM, "Off,On,Double-Sided,Shadows Only,Self Shadowing", PROPERTY_USAGE_NO_EDITOR), defaults.mesh_cast_shadow, &MeshLibrary::set_item_mesh_cast_shadow, &MeshLibrary::get_item_mesh_cast_shadow);
 
 #ifndef PHYSICS_3D_DISABLED
 	base_property_helper.register_property(PropertyInfo(Variant::ARRAY, PNAME("shapes"), PROPERTY_HINT_NONE, "", PROPERTY_USAGE_NO_EDITOR), Array(), &MeshLibrary::_set_item_shapes, &MeshLibrary::_get_item_shapes);

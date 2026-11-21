@@ -169,6 +169,7 @@ private:
 private:
 	LocalVector<char32_t> output;
 	State *state = nullptr;
+	Vector<Pair<String, String>> custom_defines;
 
 private:
 	static bool is_char_word(char32_t p_char);
@@ -222,6 +223,7 @@ private:
 	void _prepare_state(ShaderPreprocessor::State &rp_state, const String &p_filename, bool p_save_regions);
 
 public:
+	void add_define(const String &p_name, const String &p_value);
 	Error preprocess(const String &p_code, const String &p_filename, String &r_result, HashSet<Ref<ShaderInclude>> *r_includes = nullptr);
 
 #ifdef TOOLS_ENABLED

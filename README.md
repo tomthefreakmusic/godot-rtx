@@ -34,6 +34,38 @@ engine, used to publish several work-for-hire titles.
 
 ## Getting the engine
 
+### Windows RTX build
+
+The RTX branch combines the [Godot 4.8 beta 4 source][beta4] with
+[NVIDIA's path tracer and DLSS integration][nvidia-rtx]. It includes Forward+
+hardware path tracing, DLSS Super Resolution, Ray Reconstruction and Frame
+Generation, Reflex, and ray tracing debugging tools. Feature availability
+depends on the GPU, driver, and rendering backend.
+
+With the [Windows build dependencies][windows-build] installed, build the x64
+editor with Vulkan and Direct3D 12 support from PowerShell.
+
+```powershell
+python -m pip install scons zstandard
+python misc/scripts/install_d3d12_sdk_windows.py
+python misc/scripts/install_accesskit.py
+$env:GODOT_VERSION_STATUS = 'beta4'
+scons platform=windows target=editor arch=x86_64 d3d12=yes angle=no use_streamline=yes
+```
+
+Copy the Windows x64 runtime DLLs from [Streamline SDK 2.10.0][streamline-sdk]
+(`bin/x64`, excluding `development`) beside the editor executable in `bin/`.
+Use the Forward+ renderer and enable **Pathtracing Enabled** on the scene's
+`Environment`. For Ray Reconstruction, select **DLSS** under
+**Rendering > Scaling 3D > Mode** and **DLSS Ray Reconstruction** as the
+environment's denoiser. A scale below 1.0 enables upscaling. A scale of 1.0 runs
+at native resolution.
+
+[beta4]: https://github.com/godotengine/godot/commit/b070e63b161aa816afac71dcfc9d60859d38f220
+[nvidia-rtx]: https://github.com/NVIDIA-RTX/godot/commit/49a825dc52c0f1892ff5ce5cdbbe7572c638d41a
+[windows-build]: https://docs.godotengine.org/en/latest/engine_details/development/compiling/compiling_for_windows.html
+[streamline-sdk]: https://github.com/NVIDIA-RTX/Streamline/releases/tag/v2.10.0
+
 ### Binary downloads
 
 Official binaries for the Godot editor and the export templates can be found
