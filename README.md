@@ -55,8 +55,10 @@ scons platform=windows target=editor arch=x86_64 d3d12=yes angle=no use_streamli
 
 Copy the Windows x64 runtime DLLs from [Streamline SDK 2.10.0][streamline-sdk]
 (`bin/x64`, excluding `development`) beside the editor executable in `bin/`.
-Use the Forward+ renderer and enable **Pathtracing Enabled** on the scene's
-`Environment`. For Ray Reconstruction, select **DLSS** under
+For path tracing, use Forward+ with Vulkan and enable **Pathtracing Enabled**
+on the scene's `Environment`. The Direct3D 12 driver supports DLSS Super
+Resolution in the raster renderer. For Ray Reconstruction with Vulkan, select
+**DLSS** under
 **Rendering > Scaling 3D > Mode** and **DLSS Ray Reconstruction** as the
 environment's denoiser. A scale below 1.0 enables upscaling. A scale of 1.0 runs
 at native resolution.
