@@ -111,7 +111,7 @@ void Shader::set_code(const String &p_code) {
 		// pass above is authoritative for include-dependency tracking.
 		ShaderPreprocessor preprocessor_rt;
 		preprocessor_rt.add_define("RT", "1");
-		preprocessor_rt.preprocess(p_code, path, preprocessed_code_rt, nullptr, nullptr, nullptr, nullptr);
+		preprocessor_rt.preprocess(p_code, path, preprocessed_code_rt);
 	}
 
 	// Try to get the shader type from the final, fully preprocessed shader code.

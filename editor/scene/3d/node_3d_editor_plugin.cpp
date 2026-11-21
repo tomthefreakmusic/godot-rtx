@@ -2602,8 +2602,14 @@ void Node3DEditor::_notification(int p_what) {
 		} break;
 
 		case NOTIFICATION_VISIBILITY_CHANGED: {
-			if (is_visible_in_tree() && is_any_view_gizmos_enabled()) {
-				update_all_gizmos();
+			const bool visible = is_visible_in_tree();
+			set_process(visible);
+			set_physics_process(visible);
+			if (visible) {
+				if (is_any_view_gizmos_enabled()) {
+					update_all_gizmos();
+				}
+				refresh_dirty_gizmos();
 			}
 		} break;
 
@@ -2612,17 +2618,6 @@ void Node3DEditor::_notification(int p_what) {
 			_update_gizmos_menu_theme();
 			sun_title->add_theme_font_override(SceneStringName(font), get_theme_font(SNAME("title_font"), SNAME("Window")));
 			environ_title->add_theme_font_override(SceneStringName(font), get_theme_font(SNAME("title_font"), SNAME("Window")));
-		} break;
-
-		case NOTIFICATION_VISIBILITY_CHANGED: {
-			if (is_visible_in_tree()) {
-				set_process(true);
-				set_physics_process(true);
-				refresh_dirty_gizmos();
-			} else {
-				set_process(false);
-				set_physics_process(false);
-			}
 		} break;
 
 		case EditorSettings::NOTIFICATION_EDITOR_SETTINGS_CHANGED: {
